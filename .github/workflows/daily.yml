@@ -37,7 +37,7 @@ jobs:
           MAIL_TO: ${{ secrets.MAIL_TO }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python trend.py check | tee -a "$GITHUB_STEP_SUMMARY"
+        run: python trend.py check
       - name: 수집, 보고서 생성, 메일 발송
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # 호출 한도가 시간당 60회에서 5,000회로 늘어남

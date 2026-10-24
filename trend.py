@@ -3,6 +3,7 @@ import json, os, re, sys, html, threading, time, webbrowser
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 DIR = os.path.dirname(os.path.abspath(__file__))
@@ -499,13 +500,19 @@ def send_telegram(text):
     body = {"chat_id": chat, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True,
             "reply_markup": {"inline_keyboard": buttons}}
     req = Request(f"https://api.telegram.org/bot{token}/sendMessage", json.dumps(body).encode(), {"Content-Type": "application/json"})
-    with urlopen(req, timeout=30) as r:
-        r.read()
+    try:
+        with urlopen(req, timeout=30) as r:
+            r.read()
+    except HTTPError as e:  # 텔레그램이 알려주는 사유(예: chat not found, Unauthorized)를 보여준다
+        raise RuntimeError(f"{e.code} {json.load(e).get('description', '')}") from None
 
 
 def check():
     """등록된 Secrets 점검. 값은 절대 출력하지 않고 등록 여부·형식·실제 로그인/조회 결과만 보여준다."""
-    import smtplib
+    import builtins, smtplib
+
+    def print(m):  # 오류 표시(annotation)로 내보내면 로그인 없이도 실행 결과 화면과 API에서 읽을 수 있다
+        builtins.print(f"::{'notice' if m.startswith('✅') else 'warning'}::{m}")
     env = lambda k: os.environ.get(k, "")
     rules = {"SMTP_USER": lambda v: bool(v), "SMTP_PASS": lambda v: bool(v),
              "MAIL_TO": lambda v: "@" in v, "TELEGRAM_BOT_TOKEN": lambda v: bool(re.fullmatch(r"\d{6,}:[A-Za-z0-9_-]{30,}", v)),
@@ -564,9 +571,14 @@ def ci():
         try:
             fn()
             print(name, "발송 완료")
-        except Exception as e:  # 토큰이 로그에 남지 않도록 오류 종류만 출력
+            print(f"::notice::{name} 발송 완료")
+        except Exception as e:  # 오류 사유를 보여주되 비밀값은 가린다
             failed.append(name)
-            print(f"::warning::{name} 발송 실패: {type(e).__name__}")
+            why = f"{type(e).__name__}: {e}"
+            for k in ("TELEGRAM_BOT_TOKEN", "SMTP_PASS", "SMTP_USER"):
+                if os.environ.get(k):
+                    why = why.replace(os.environ[k], "***")
+            print(f"::warning::{name} 발송 실패 - {why[:300]}")
     if not channels:
         print("::warning::발송 채널이 설정되지 않았습니다 (SMTP_USER 또는 TELEGRAM_BOT_TOKEN 필요)")
     if channels and len(failed) == len(channels):
