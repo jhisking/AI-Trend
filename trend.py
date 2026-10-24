@@ -562,6 +562,9 @@ def ci():
     os.makedirs("_site", exist_ok=True)
     shutil.copy(REPORT, os.path.join("_site", "index.html"))
     channels = []
+    if os.environ.get("SKIP_SEND") == "true":  # 시험 실행(push 트리거): 수집·보고서·게시만 하고 발송은 하지 않음
+        print("::notice::시험 실행이라 메일·텔레그램 발송은 건너뜀")
+        return
     if os.environ.get("SMTP_USER"):
         channels.append(("메일", lambda: send_mail(f"[AI 트렌드 보고서] {datetime.now(KST):%m/%d} 오늘의 Top10", render_mail(items, errors))))
     if os.environ.get("TELEGRAM_BOT_TOKEN"):
