@@ -389,7 +389,6 @@ def render(items, errors):
                   note + row_list(by_fork, lambda i: i["forks"], lambda i: f"{i['forks']:,}", lambda i: f"별 {i['stars']:,}"))
     err = f"<p class='err'>일부 수집 실패(호출 제한 가능): {html.escape('; '.join(errors))}</p>" if errors else ""
     now = datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S")
-    actions_url = workflow_url()
     return f"""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>AI 트렌드 보고서</title><style>{CSS}</style></head><body><div class="wrap">
 <header><div><h1>AI 트렌드 보고서</h1><div class="ts">GitHub skill·플러그인 · 수집 시각 {now}<br>유형 배지(📦 플러그인 · 🧩 스킬 · 🔌 MCP 서버 · 🤖 에이전트 · 📚 모음집 · 🛠️ 도구)는 이름·설명·토픽 키워드로 자동 추정한 값입니다</div></div>
@@ -403,9 +402,9 @@ def render(items, errors):
 const dlg = document.getElementById('dlg');
 function pv(id){{dlg.querySelector('.bd').innerHTML=document.getElementById('pv-'+id).innerHTML;dlg.showModal();dlg.scrollTop=0}}
 dlg.addEventListener('click',e=>{{if(e.target===dlg)dlg.close()}});
-const live = ['localhost','127.0.0.1'].includes(location.hostname), b = document.getElementById('b'), ACTIONS = '{actions_url}';
-if(!live){{if(ACTIONS){{b.textContent='🔄 새로 수집 (GitHub에서 실행)';b.onclick=()=>window.open(ACTIONS)}}
- else{{b.disabled=true;b.title='python trend.py serve 로 연 화면에서만 동작합니다'}}}}
+const live = ['localhost','127.0.0.1'].includes(location.hostname), b = document.getElementById('b');
+if(!live){{b.textContent='🔄 새로고침';b.onclick=()=>location.replace(location.pathname+'?t='+Date.now());
+ setInterval(()=>b.onclick(),600000)}}  // 클라우드 화면: 서버가 없으니 10분마다 최신 배포본을 다시 불러옴
 async function go(){{b.disabled=true;b.textContent='수집 중… (최대 1분)';
  try{{await fetch('/refresh',{{method:'POST'}});location.reload()}}catch(e){{b.textContent='실패 - 다시 시도';b.disabled=false}}}}
 </script></body></html>"""
