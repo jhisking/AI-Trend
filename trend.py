@@ -474,14 +474,54 @@ def build():
     return items, errors
 
 
+def render_telegram(items):
+    """텔레그램용 요약(4096자 제한): 항목별 Top5, 이름·유형·수치만."""
+    top = lambda key: sorted(items, key=key, reverse=True)[:5]
+    sections = [("⭐ 별", top(lambda i: i["stars"]), lambda i: f"{i['stars']:,}"),
+                ("🚀 급상승", top(lambda i: i["surge"]), lambda i: f"+{i['surge']:,}"),
+                ("👀 관심도", top(lambda i: i["forks"] + i["watchers"]), lambda i: f"{i['forks'] + i['watchers']:,}"),
+                ("🍴 포크", top(lambda i: i["forks"]), lambda i: f"{i['forks']:,}")]
+    out = f"<b>AI 트렌드 보고서</b> · {datetime.now(KST):%m/%d %H:%M}\n"
+    for title, rows, fmt in sections:
+        out += f"\n<b>{title} Top5</b>\n"
+        out += "".join(f"{n}. <a href='{i['url']}'>{html.escape(i['name'])}</a> {kind(i)[0]} {fmt(i)}\n" for n, i in enumerate(rows, 1))
+    return out
+
+
+def send_telegram(text):
+    token, chat = os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_CHAT_ID"]
+    buttons = [[{"text": t, "url": u}] for t, u in (("📊 전체 보고서 보기", os.environ.get("REPORT_URL", "")),
+                                                   ("🔄 지금 새로 수집", workflow_url())) if u]
+    body = {"chat_id": chat, "text": text, "parse_mode": "HTML", "disable_web_page_preview": True,
+            "reply_markup": {"inline_keyboard": buttons}}
+    req = Request(f"https://api.telegram.org/bot{token}/sendMessage", json.dumps(body).encode(), {"Content-Type": "application/json"})
+    with urlopen(req, timeout=30) as r:
+        r.read()
+
+
 def ci():
-    """GitHub Actions용: 수집, Pages용 사본 저장, 메일 발송."""
+    """GitHub Actions용: 수집, Pages용 사본 저장, 메일·텔레그램 발송. 설정된 채널만 보내고 하나가 실패해도 나머지는 시도."""
     import shutil
     items, errors = build()
     os.makedirs("_site", exist_ok=True)
     shutil.copy(REPORT, os.path.join("_site", "index.html"))
-    send_mail(f"[AI 트렌드 보고서] {datetime.now(KST):%m/%d} 오늘의 Top10", render_mail(items, errors))
-    print("mail sent to", os.environ["MAIL_TO"])
+    channels = []
+    if os.environ.get("SMTP_USER"):
+        channels.append(("메일", lambda: send_mail(f"[AI 트렌드 보고서] {datetime.now(KST):%m/%d} 오늘의 Top10", render_mail(items, errors))))
+    if os.environ.get("TELEGRAM_BOT_TOKEN"):
+        channels.append(("텔레그램", lambda: send_telegram(render_telegram(items))))
+    failed = []
+    for name, fn in channels:
+        try:
+            fn()
+            print(name, "발송 완료")
+        except Exception as e:  # 토큰이 로그에 남지 않도록 오류 종류만 출력
+            failed.append(name)
+            print(f"::warning::{name} 발송 실패: {type(e).__name__}")
+    if not channels:
+        print("::warning::발송 채널이 설정되지 않았습니다 (SMTP_USER 또는 TELEGRAM_BOT_TOKEN 필요)")
+    if channels and len(failed) == len(channels):
+        raise SystemExit("모든 발송 채널 실패")
 
 
 class Handler(BaseHTTPRequestHandler):
