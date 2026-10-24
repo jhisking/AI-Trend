@@ -1,3 +1,9 @@
 report.html
 _site/
 __pycache__/
+secrets-helper.html
+naver_mail_pass.txt
+*pass*.txt
+telegram*.txt
+*token*
+*secret*.txt

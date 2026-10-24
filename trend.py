@@ -503,6 +503,51 @@ def send_telegram(text):
         r.read()
 
 
+def check():
+    """등록된 Secrets 점검. 값은 절대 출력하지 않고 등록 여부·형식·실제 로그인/조회 결과만 보여준다."""
+    import smtplib
+    env = lambda k: os.environ.get(k, "")
+    rules = {"SMTP_USER": lambda v: bool(v), "SMTP_PASS": lambda v: bool(v),
+             "MAIL_TO": lambda v: "@" in v, "TELEGRAM_BOT_TOKEN": lambda v: bool(re.fullmatch(r"\d{6,}:[A-Za-z0-9_-]{30,}", v)),
+             "TELEGRAM_CHAT_ID": lambda v: bool(re.fullmatch(r"-?\d+", v))}
+    hint = {"SMTP_USER": "네이버 아이디", "SMTP_PASS": "애플리케이션 비밀번호", "MAIL_TO": "이메일 주소(@ 포함)",
+            "TELEGRAM_BOT_TOKEN": "123456789:ABC... 형태", "TELEGRAM_CHAT_ID": "숫자만(예: 123456789)"}
+    for k, ok in rules.items():
+        v = env(k)
+        if not v:
+            print(f"❌ {k}: 등록되지 않았거나 비어 있음")
+        elif v != v.strip():
+            print(f"⚠️ {k}: 앞뒤에 공백/줄바꿈이 들어 있음 → 다시 등록하세요")
+        elif not ok(v):
+            print(f"⚠️ {k}: 형식이 이상함 ({hint[k]})")
+        else:
+            print(f"✅ {k}: 등록됨, 형식 정상")
+    if env("SMTP_USER") and env("SMTP_PASS"):
+        host = env("SMTP_HOST") or "smtp.naver.com"
+        try:
+            with smtplib.SMTP_SSL(host, int(env("SMTP_PORT") or 465), timeout=30) as s:
+                s.login(env("SMTP_USER").split("@")[0] if "naver" in host else env("SMTP_USER"), env("SMTP_PASS"))
+            print(f"✅ 메일 서버({host}) 로그인 성공")
+        except Exception as e:
+            print(f"❌ 메일 서버 로그인 실패: {type(e).__name__} → 아이디·애플리케이션 비밀번호·SMTP 사용 설정 확인")
+    if env("TELEGRAM_BOT_TOKEN"):
+        def tg(method, **q):
+            url = f"https://api.telegram.org/bot{env('TELEGRAM_BOT_TOKEN')}/{method}?" + "&".join(f"{a}={quote(str(b))}" for a, b in q.items())
+            with urlopen(url, timeout=30) as r:
+                return json.load(r)["result"]
+        try:
+            print(f"✅ 텔레그램 봇 확인됨: @{tg('getMe')['username']}")
+        except Exception as e:
+            print(f"❌ 텔레그램 토큰이 올바르지 않음: {type(e).__name__}")
+        else:
+            if env("TELEGRAM_CHAT_ID"):
+                try:
+                    tg("getChat", chat_id=env("TELEGRAM_CHAT_ID"))
+                    print("✅ 텔레그램 채팅 ID 확인됨")
+                except Exception as e:
+                    print(f"❌ 채팅 ID 확인 실패({type(e).__name__}) → 숫자 ID가 맞는지, 봇에게 먼저 Start를 눌렀는지 확인")
+
+
 def ci():
     """GitHub Actions용: 수집, Pages용 사본 저장, 메일·텔레그램 발송. 설정된 채널만 보내고 하나가 실패해도 나머지는 시도."""
     import shutil
@@ -555,6 +600,8 @@ if __name__ == "__main__":
         build()
     elif cmd == "ci":
         ci()
+    elif cmd == "check":
+        check()
     else:
         if cmd == "morning" or not os.path.exists(REPORT):  # morning: 매일 아침 새로 만든 뒤 브라우저로 보여줌
             build()

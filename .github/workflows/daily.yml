@@ -25,6 +25,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: 비밀값 점검 (값은 출력하지 않음)
+        continue-on-error: true
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python trend.py check | tee -a "$GITHUB_STEP_SUMMARY"
       - name: 수집, 보고서 생성, 메일 발송
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # 호출 한도가 시간당 60회에서 5,000회로 늘어남
