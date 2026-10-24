@@ -453,12 +453,16 @@ def send_mail(subject, body):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     user, pw, to = os.environ["SMTP_USER"], os.environ["SMTP_PASS"], os.environ["MAIL_TO"]
+    # 값이 비어 있으면(GitHub Secret 미등록) 네이버 기본값 사용. 네이버는 로그인에 아이디만, 보내는 주소는 전체 주소여야 함
+    host = os.environ.get("SMTP_HOST") or "smtp.naver.com"
+    port = int(os.environ.get("SMTP_PORT") or 465)
+    sender = os.environ.get("MAIL_FROM") or (user if "@" in user else user + "@naver.com")
     msg = MIMEMultipart("alternative")
-    msg["Subject"], msg["From"], msg["To"] = subject, os.environ.get("MAIL_FROM", user), to
+    msg["Subject"], msg["From"], msg["To"] = subject, sender, to
     msg.attach(MIMEText("HTML을 지원하는 메일 프로그램에서 확인하세요.", "plain", "utf-8"))
     msg.attach(MIMEText(body, "html", "utf-8"))
-    with smtplib.SMTP_SSL(os.environ.get("SMTP_HOST", "smtp.gmail.com"), int(os.environ.get("SMTP_PORT", "465")), timeout=60) as s:
-        s.login(user, pw)
+    with smtplib.SMTP_SSL(host, port, timeout=60) as s:
+        s.login(user.split("@")[0] if "naver" in host else user, pw)
         s.send_message(msg)
 
 
