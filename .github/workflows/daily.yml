@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "0 23 * * *"   # UTC 23:00 = 한국시간 08:00 (GitHub 사정으로 몇 분~1시간 늦을 수 있음)
   workflow_dispatch:        # 메일의 "지금 새로 수집" 버튼 / Actions 탭의 Run workflow
+  push:                     # 임시 시험용: .run-test 파일이 바뀌면 실행 (시험 후 제거)
+    paths: [".run-test"]
 
 permissions:
   contents: write           # 기록 파일(history.json 등) 커밋
